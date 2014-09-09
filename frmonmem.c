@@ -1,10 +1,17 @@
 //frmonmem
 //based on captVideo.c
+//
+//compile 
+// C_INCLUDE_PATH=.\OpenCV2.0\include\opencv;
+// LIBRARY_PATH=.\OpenCV2.0\lib;
+// gcc frmonmem.c -o frmonmem.exe -lcxcore200.dll -lcv200.dll -lhighgui200.dll -lcvaux200.dll -lml200.dll -lwinmm -g
+//
 
 #include <cv.h>
 #include <highgui.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <windows.h>
 #include "./SetHeaderIplImg_VGA.c"
 
 const char gsVersion[]="FrmOnMem_v00_0_0";
@@ -14,7 +21,9 @@ enum{
 	MAX_M_TIME = 1,
 	WIDTH = 640,
 	HEIGHT = 480,
-	AREA = WIDTH * HEIGHT
+	AREA = WIDTH * HEIGHT,
+	WAIT_FRAME_MS = 50 //33ms = 30fps , 66 ms = 15fps, 50ms = 20fps
+	
 };
 
 IplImage *gpimgMat[MAX_N_FRAME];
@@ -23,6 +32,8 @@ IplImage gMimgMat[MAX_N_FRAME];
 
 IplImage *gpimgRep[MAX_N_FRAME];
 IplImage gMimgRep[MAX_N_FRAME];
+
+unsigned int guiFlagFrameOver=0;
 
 //IplImage gImgLgCapt[276480000]; // 30*30*640*480  //2147483647
 long gImgLgCapt[MAX_M_TIME][MAX_N_FRAME][AREA]; // 30*30*640*480  //2147483647
@@ -56,7 +67,17 @@ int main (int argc, char *argv[])
 	char str[64];//for video
 	int FlmNum=0;
 	unsigned int uilpPX;
+	double dRemainWaitTime;
+	double dFreqTick = cvGetTickFrequency();
+	long long int llTickA;
+	long long int llTickB;
+	double dTakesTimeResult;
+	long long *pllMemDistination;
+	long long *pllMemSource;
+	unsigned int uiTargetWaitMs=WAIT_FRAME_MS;
 	
+	
+	guiFlagFrameOver=0;
 	// usage a.exe [Num camera] [filename] [SwOpenWin]
 	
 	// (1)コマンド引数によって指定された番号のカメラに対するキャプチャ構造体を作成する
@@ -103,7 +124,7 @@ int main (int argc, char *argv[])
 	if (argc >3 )
 	{
 			uiFlagOpenWin = (atoi(argv[3])==1);
-			printf("Please push ESC for shutter\n");
+			printf("Please push ESC for exit\n");
 	}
 
 	
@@ -112,17 +133,15 @@ int main (int argc, char *argv[])
 	cvSetCaptureProperty (capture, CV_CAP_PROP_FRAME_WIDTH, w);
 	cvSetCaptureProperty (capture, CV_CAP_PROP_FRAME_HEIGHT, h);
 	
-//	vw = cvCreateVideoWriter (FNameSv, -1, 15, cvSize ((int) w, (int) h),1);
-	vw = cvCreateVideoWriter (FNameSv, CV_FOURCC ('M', 'S', 'V', 'C'), 15, cvSize ((int) w, (int) h),1);
 	
 	
-	if(uiFlagOpenWin==1)
-	{
+//	if(uiFlagOpenWin==1)
+//	{
 		cvNamedWindow ("Capture", CV_WINDOW_AUTOSIZE);
 		cvNamedWindow ("Replay", CV_WINDOW_AUTOSIZE);
 		cvMoveWindow ("Capture", 50,50);
 		cvMoveWindow ("Replay", 700,50);
-	}
+//	}
 	
 
 	// (3)カメラから画像をキャプチャする
@@ -133,7 +152,7 @@ int main (int argc, char *argv[])
 //cvGetTickFrequency()
 
 // // --------------------------------------------------------------
-// //  main
+// //  make matrix
 // // --------------------------------------------------------------
 
 	//gpimgTmp = cvCreateImage(cvSize(w,h),IPL_DEPTH_8U,3);
@@ -150,13 +169,9 @@ int main (int argc, char *argv[])
 		gpimgRep[uilp] = &gMimgRep[uilp];
 		SetHeaderIplImg_VGA(gpimgRep[uilp]);
 		gpimgRep[uilp]->imageData = &gImgLgRept[uilpT][uilp][0];
-
 	}
 
-
 	captFile = cvCaptureFromAVI(FileNameLd);
-	
-
 	uilp=0;
 	while(1)
 	{
@@ -164,34 +179,132 @@ int main (int argc, char *argv[])
 		{
 		    break;
 		}
-			for(uilpPX=0;uilpPX<(640*480*3);uilpPX++)
-			{
-		//		gpimgRep[uilp]->imageData[uilpPX] = frame->imageData[uilpPX];
-			}
-			cvCopyImage(frame,gpimgRep[uilp]);
-		//cvShowImage ("Replay", gpimgRep[uilp]);
-		c = cvWaitKey (25); // wait n milliseconds
+		cvCopyImage(frame,gpimgRep[uilp]);
 		uilp++;
 	}
-     
 
-	if(uiFlagOpenWin==1)
+
+// // --------------------------------------------------------------
+// //  check processtime
+// // --------------------------------------------------------------
+
+	#define N_LOOP_EVAL_SYS 50
+	double dTakesTimeCalc[N_LOOP_EVAL_SYS];
+	printf("checking process time\n");
+	for(uilp=0;uilp<N_LOOP_EVAL_SYS;uilp++)
 	{
+		llTickA = cvGetTickCount();
+		frame = cvQueryFrame (capture);
+		for(uilpPX=0;uilpPX<(640*480*3);uilpPX++)
+		{
+			gpimgMat[uilp]->imageData[uilpPX] = frame->imageData[uilpPX];
+		}
+		cvShowImage ("Capture", gpimgMat[uilp]);
+		cvShowImage ("Replay", gpimgRep[uilp]);
+		llTickB = cvGetTickCount();
+		dTakesTimeResult = ( llTickB - llTickA)/cvGetTickFrequency() /1000;
+		dTakesTimeCalc[uilp]=dTakesTimeResult;
+	}
+	//printf("takeTicks%e\n",cvGetTickCount() - cvGetTickCount());
+	//for(uilp=0;uilp<N_LOOP_EVAL_SYS;uilp++)
+	//	printf("time%d\t%e\n",uilp,dTakesTimeCalc[uilp]);
+	// takeTicks0.000000e+000
+	// time0   8.883266e+000
+	// time1   1.295886e+001
+	// time2   3.246333e+001
+	// time3   3.233828e+001
+	// time4   3.217605e+001
+	// time5   3.334306e+001
+	// time6   3.247026e+001
+	// time7   3.251036e+001
+	// time8   3.275937e+001
+	// time9   3.179434e+001
+
+	double dMaxTmp=0;
+	double dSumTmp=0;
+	
+	for(uilp=0;uilp<N_LOOP_EVAL_SYS;uilp++)
+	{
+		// printf("time%d\t%e\n",uilp,dTakesTimeCalc[uilp]);
+		dSumTmp += dTakesTimeCalc[uilp]*(uilp!=0); //skip first count
+		if (dMaxTmp<dTakesTimeCalc[uilp])
+		{
+			dMaxTmp = dTakesTimeCalc[uilp];
+		}
+	}
+	uiTargetWaitMs = (int)(dMaxTmp+0.9)+10;
+	printf("max time= %f\tavefage= %f\n",dMaxTmp, dSumTmp/(N_LOOP_EVAL_SYS-1));
+
+
+
+
+// 	for(uilp=0;uilp<10;uilp++)
+// 	{
+// 		llTickA = cvGetTickCount();
+// 		frame = cvQueryFrame (capture);
+// 		pllMemDistination =(long long *)&(gpimgMat[uilp]->imageData[0]);
+// 		pllMemSource =(long long *)&(frame->imageData[0]);
+// 		for(uilpPX=0;uilpPX<(640*480*3)/8;uilpPX++)
+// 		{
+// 			pllMemDistination[uilpPX] = pllMemSource[uilpPX];
+// 		}
+// // 		for(uilpPX=0;uilpPX<(640*480*3);uilpPX++)
+// // 		{
+// // 			gpimgMat[uilp]->imageData[uilpPX] = frame->imageData[uilpPX];
+// // 		}
+// 		cvShowImage ("Capture", gpimgMat[uilp]);
+// 		cvShowImage ("Replay", gpimgRep[uilp]);
+// 		llTickB = cvGetTickCount();
+// 		dTakesTimeResult = ( llTickB - llTickA)/cvGetTickFrequency() /1000;
+// 		dTakesTimeCalc[uilp]=dTakesTimeResult;
+// 	}
+// 	printf("takeTicks%e\n",cvGetTickCount() - cvGetTickCount());
+// 	for(uilp=0;uilp<10;uilp++)
+// 		printf("time%d\t%e\n",uilp,dTakesTimeCalc[uilp]);
+// 	// takeTicks0.000000e+000
+// 	// time0   1.591157e+001
+// 	// time1   3.230511e+001
+// 	// time2   4.783168e+001
+// 	// time3   3.198355e+001
+// 	// time4   3.180892e+001
+// 	// time5   3.214761e+001
+// 	// time6   3.181767e+001
+// 	// time7   3.235141e+001
+// 	// time8   3.185340e+001
+// 	// time9   3.200032e+001
+// 
+
+// // --------------------------------------------------------------
+// //  main
+// // --------------------------------------------------------------
+		dFreqTick = cvGetTickFrequency();
+		dRemainWaitTime=0;
+//	if(uiFlagOpenWin==1)
+//	{
+	  PlaySound("kakumabon03.wav",NULL,SND_FILENAME | SND_ASYNC);//sound start
 //		while (1) {
 		for(uilp=0;uilp<MAX_N_FRAME;uilp++){
 
 	//	  GetLocalTime(&stTime);
 	//		cvGetTickCount();
+			llTickA = cvGetTickCount();
 
 			frame = cvQueryFrame (capture);
 //			cvWriteFrame (vw, frame);//for video
 			
 //			cvCopyImage(frame,gpimgMat[uilp]);
 
-			for(uilpPX=0;uilpPX<(640*480*3);uilpPX++)
-			{
-				gpimgMat[uilp]->imageData[uilpPX] = frame->imageData[uilpPX];
-			}
+				for(uilpPX=0;uilpPX<(640*480*3);uilpPX++)
+				{
+					gpimgMat[uilp]->imageData[uilpPX] = frame->imageData[uilpPX];
+				}
+
+// 			pllMemDistination =(long long *)&(gpimgMat[uilp]->imageData[0]);
+// 			pllMemSource =(long long *)&(frame->imageData[0]);
+// 			for(uilpPX=0;uilpPX<(640*480*3)/8;uilpPX++)
+// 			{
+// 				pllMemDistination[uilpPX] = pllMemSource[uilpPX];
+// 			}
 
 //			 printf("in\t%d\t %X\n",uilp,gpimgMat[uilp]->imageData); // ok
 			
@@ -200,27 +313,35 @@ int main (int argc, char *argv[])
 			//frame=cvQueryFrame(captFile);
 			//cvShowImage ("Replay", frame);
 
-			c = cvWaitKey (33); // wait n milliseconds
-//			c = cvWaitKey (1); // wait n milliseconds
-			//c = cvWaitKey (10);
+			llTickB = cvGetTickCount();
+			dTakesTimeResult = ( llTickB - llTickA)/dFreqTick /1000;
+			dRemainWaitTime = uiTargetWaitMs - dTakesTimeResult;
+
+			if (dRemainWaitTime <= 0)
+			{
+				guiFlagFrameOver=1;
+				dRemainWaitTime=1;
+			}
+			else
+			{
+				c = cvWaitKey ((int)dRemainWaitTime); // wait n milliseconds
+			}
+			//c = cvWaitKey (33); // wait n milliseconds
 			if (c == '\x1b')
 				break;
 		}
 
+		PlaySound(NULL,NULL,0);//sound stop
+
 
 		cvReleaseCapture (&capture);
-//		c = cvWaitKey (1000); // wait n milliseconds
-
-
-		for(uilp=0;uilp<MAX_N_FRAME;uilp++)
-		{
-			 cvWriteFrame (vw, gpimgMat[uilp]);//for video
-			// it takes too much time!
-		}
-		cvReleaseVideoWriter (&vw);//for video
-		
 		cvDestroyWindow ("Capture");
 		cvDestroyWindow ("Replay");
+
+
+// // --------------------------------------------------------------
+// //  replay
+// // --------------------------------------------------------------
 		cvNamedWindow ("ReplayNow", CV_WINDOW_AUTOSIZE);
 //		c = cvWaitKey (1000); // wait n milliseconds
 
@@ -233,7 +354,7 @@ int main (int argc, char *argv[])
 
 			cvShowImage ("ReplayNow", gpimgMat[uilp]);
 
-			c = cvWaitKey (33); // wait n milliseconds
+			c = cvWaitKey (uiTargetWaitMs); // wait n milliseconds
 //			c = cvWaitKey (40); // wait n milliseconds
 			//c = cvWaitKey (10);
 			if (c == '\x1b')
@@ -247,7 +368,30 @@ int main (int argc, char *argv[])
 
 	//	cvDestroyWindow ("Capture");
 		cvDestroyWindow ("ReplayNow");
-	}
+//	}
+
+
+// // --------------------------------------------------------------
+// //  file save
+// // --------------------------------------------------------------
+		printf("guiFlagFrameOver=%d\n",guiFlagFrameOver);
+		printf("waitTime=%d[ms]\n",uiTargetWaitMs);
+		double dRecodeFps = (1/(double)(uiTargetWaitMs)*1000);
+		printf("Frame Per Sec =%f\n",dRecodeFps);
+		printf(" save file now....");
+//	vw = cvCreateVideoWriter (FNameSv, -1, 15, cvSize ((int) w, (int) h),1);
+//		vw = cvCreateVideoWriter (FNameSv, CV_FOURCC ('M', 'S', 'V', 'C'), 15, cvSize (WIDTH, HEIGHT),1);
+		vw = cvCreateVideoWriter (FNameSv, CV_FOURCC ('M', 'S', 'V', 'C'), dRecodeFps, cvSize (WIDTH, HEIGHT),1);
+
+		for(uilp=0;uilp<MAX_N_FRAME;uilp++)
+		{
+			 cvWriteFrame (vw, gpimgMat[uilp]);//for video
+			// it takes too much time!
+			if(uilp%(MAX_N_FRAME/8)==0)	printf("..");
+		}
+		cvReleaseVideoWriter (&vw);//for video
+		printf("...done\n");
+
 // // --------------------------------------------------------------
 // // epilogue
 // // --------------------------------------------------------------
