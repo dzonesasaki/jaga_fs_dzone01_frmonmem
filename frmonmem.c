@@ -44,10 +44,11 @@ void SetHeaderIplImg_VGA(IplImage *phead);
 
 
 #define NBUF 1024
-int main (int argc, char *argv[]) 
+//int main (int argc, char *argv[]) 
+int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int showCmd)
 {
-  SYSTEMTIME stTime;
-
+	SYSTEMTIME stTime;
+	//int argc;char *argv[];
 	CvCapture *capture = 0;
 	CvCapture *captFile=0;
 	IplImage *frame = 0;
@@ -57,7 +58,7 @@ int main (int argc, char *argv[])
 	double w = WIDTH, h = HEIGHT;//QVGA
 	int c;
 	unsigned int uilp;
-	const char FileNameSv[]="captImage.avi";
+	const char FileNameSv[]="captMv.avi";
 	const char FileNameLd[]="captImage.avi";
 	char FNameSv[NBUF];
 	unsigned int uiFlagOpenWin=0;
@@ -79,7 +80,7 @@ int main (int argc, char *argv[])
 	
 	guiFlagFrameOver=0;
 	// usage a.exe [Num camera] [filename] [SwOpenWin]
-	
+/*	
 	// (1)コマンド引数によって指定された番号のカメラに対するキャプチャ構造体を作成する
 //	if (argc == 1 || (argc == 2 && strlen (argv[1]) == 1 && isdigit (argv[1][0])))
 	if (argc >1  && strlen (argv[1]) == 1 && isdigit (argv[1][0]))
@@ -126,7 +127,11 @@ int main (int argc, char *argv[])
 			uiFlagOpenWin = (atoi(argv[3])==1);
 			printf("Please push ESC for exit\n");
 	}
+*/
+	capture = cvCaptureFromCAM  ( 0 );
 
+	uiFlagOpenWin=1;
+	
 	
 	/* この設定は，利用するカメラに依存する */
 	// (2)キャプチャサイズを設定する．
@@ -281,7 +286,7 @@ int main (int argc, char *argv[])
 		dRemainWaitTime=0;
 //	if(uiFlagOpenWin==1)
 //	{
-	  PlaySound("kakumabon03.wav",NULL,SND_FILENAME | SND_ASYNC);//sound start
+	  PlaySound("c:\\tst.wav",NULL,SND_FILENAME | SND_ASYNC);//sound start
 //		while (1) {
 		for(uilp=0;uilp<MAX_N_FRAME;uilp++){
 
