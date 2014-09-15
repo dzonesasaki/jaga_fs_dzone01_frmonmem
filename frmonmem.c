@@ -4,7 +4,7 @@
 //compile 
 // C_INCLUDE_PATH=.\OpenCV2.0\include\opencv;
 // LIBRARY_PATH=.\OpenCV2.0\lib;
-// gcc frmonmem.c -o frmonmem.exe -lcxcore200.dll -lcv200.dll -lhighgui200.dll -lcvaux200.dll -lml200.dll -lwinmm -g
+// gcc frmonmem.c -o frmonmem.exe -lcxcore200.dll -lcv200.dll -lhighgui200.dll -lcvaux200.dll -lml200.dll -lwinmm -g  -mwindows -lwinmm
 //
 
 #include <cv.h>
@@ -17,12 +17,12 @@
 const char gsVersion[]="FrmOnMem_v00_0_0";
 
 enum{
-	MAX_N_FRAME = 100,
+	MAX_N_FRAME = 295,
 	MAX_M_TIME = 1,
 	WIDTH = 640,
 	HEIGHT = 480,
 	AREA = WIDTH * HEIGHT,
-	WAIT_FRAME_MS = 50 //33ms = 30fps , 66 ms = 15fps, 50ms = 20fps
+	WAIT_FRAME_MS = 105 //33ms = 30fps , 66 ms = 15fps, 50ms = 20fps , 105 is macBook
 	
 };
 
@@ -38,6 +38,8 @@ unsigned int guiFlagFrameOver=0;
 //IplImage gImgLgCapt[276480000]; // 30*30*640*480  //2147483647
 long gImgLgCapt[MAX_M_TIME][MAX_N_FRAME][AREA]; // 30*30*640*480  //2147483647
 long gImgLgRept[MAX_M_TIME][MAX_N_FRAME][AREA]; // 30*30*640*480  //2147483647
+
+unsigned int uiMatHBuf[WIDTH*3];
 
 void SetHeaderIplImg_VGA(IplImage *phead);
 
@@ -58,16 +60,17 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 	double w = WIDTH, h = HEIGHT;//QVGA
 	int c;
 	unsigned int uilp;
-	const char FileNameSv[]="captMv.avi";
+	const char FileNameSv[]=".\\captMv.avi"; //"captMv.avi";
 	const char FileNameLd[]="captImage.avi";
 	char FNameSv[NBUF];
+	char FNameLd[NBUF];
 	unsigned int uiFlagOpenWin=0;
 	unsigned int uiIndxCam=0;
 	CvVideoWriter *vw;//for video
 	CvFont font;//for video
 	char str[64];//for video
 	int FlmNum=0;
-	unsigned int uilpPX;
+	unsigned int uilpPX,uilpPY,uilpPBGR;
 	double dRemainWaitTime;
 	double dFreqTick = cvGetTickFrequency();
 	long long int llTickA;
@@ -76,12 +79,17 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 	long long *pllMemDistination;
 	long long *pllMemSource;
 	unsigned int uiTargetWaitMs=WAIT_FRAME_MS;
+	unsigned int uiNumFrameMax=MAX_N_FRAME;
+	unsigned int uiFlCounter =1;
+	FILE *fid;
+	char cMessBuf[256];
+
 	
 	
 	guiFlagFrameOver=0;
 	// usage a.exe [Num camera] [filename] [SwOpenWin]
 /*	
-	// (1)ƒRƒ}ƒ“ƒhˆø”‚É‚æ‚Á‚Äw’è‚³‚ê‚½”Ô†‚ÌƒJƒƒ‰‚É‘Î‚·‚éƒLƒƒƒvƒ`ƒƒ\‘¢‘Ì‚ğì¬‚·‚é
+	// (1)ã‚³ãƒãƒ³ãƒ‰å¼•æ•°ã«ã‚ˆã£ã¦æŒ‡å®šã•ã‚ŒãŸç•ªå·ã®ã‚«ãƒ¡ãƒ©ã«å¯¾ã™ã‚‹ã‚­ãƒ£ãƒ—ãƒãƒ£æ§‹é€ ä½“ã‚’ä½œæˆã™ã‚‹
 //	if (argc == 1 || (argc == 2 && strlen (argv[1]) == 1 && isdigit (argv[1][0])))
 	if (argc >1  && strlen (argv[1]) == 1 && isdigit (argv[1][0]))
 	{
@@ -133,8 +141,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 	uiFlagOpenWin=1;
 	
 	
-	/* ‚±‚Ìİ’è‚ÍC—˜—p‚·‚éƒJƒƒ‰‚ÉˆË‘¶‚·‚é */
-	// (2)ƒLƒƒƒvƒ`ƒƒƒTƒCƒY‚ğİ’è‚·‚éD
+	/* ã“ã®è¨­å®šã¯ï¼Œåˆ©ç”¨ã™ã‚‹ã‚«ãƒ¡ãƒ©ã«ä¾å­˜ã™ã‚‹ */
+	// (2)ã‚­ãƒ£ãƒ—ãƒãƒ£ã‚µã‚¤ã‚ºã‚’è¨­å®šã™ã‚‹ï¼
 	cvSetCaptureProperty (capture, CV_CAP_PROP_FRAME_WIDTH, w);
 	cvSetCaptureProperty (capture, CV_CAP_PROP_FRAME_HEIGHT, h);
 	
@@ -149,7 +157,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 //	}
 	
 
-	// (3)ƒJƒƒ‰‚©‚ç‰æ‘œ‚ğƒLƒƒƒvƒ`ƒƒ‚·‚é
+	// (3)ã‚«ãƒ¡ãƒ©ã‹ã‚‰ç”»åƒã‚’ã‚­ãƒ£ãƒ—ãƒãƒ£ã™ã‚‹
 	for(uilp=0;uilp<10;uilp++){
 		frame = cvQueryFrame (capture);
 	}
@@ -176,7 +184,26 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 		gpimgRep[uilp]->imageData = &gImgLgRept[uilpT][uilp][0];
 	}
 
-	captFile = cvCaptureFromAVI(FileNameLd);
+
+
+	for (uilp=0;uilp<1000;uilp++)
+	{
+		wsprintf(FNameLd,".\\captMv%05d.avi",uilp);
+		fid=fopen(FNameLd,"r");
+		if (fid==NULL)
+		{
+			wsprintf(cMessBuf,"no file: %X",uilp);
+			//MessageBox(NULL,cMessBuf , "error", MB_OK);
+			break;
+		}
+		fclose(fid);
+	}
+	uiFlCounter = uilp-1;
+
+	wsprintf(FNameLd,".\\captMv%05d.avi",uiFlCounter);
+
+//	captFile = cvCaptureFromAVI(FileNameLd);
+	captFile = cvCaptureFromAVI(FNameLd);
 	uilp=0;
 	while(1)
 	{
@@ -184,10 +211,21 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 		{
 		    break;
 		}
-		cvCopyImage(frame,gpimgRep[uilp]);
+		//cvCopyImage(frame,gpimgRep[uilp]);
+		cvCopyImage(frame,gpimgMat[uilp]);
 		uilp++;
 	}
+	uiNumFrameMax = uilp;
 
+	for(uilp=0;uilp<uiNumFrameMax;uilp++)
+	for(uilpPY=0;uilpPY<(HEIGHT);uilpPY++)
+	for(uilpPX=0;uilpPX<(WIDTH);uilpPX++)
+	for(uilpPBGR=0;uilpPBGR<(3);uilpPBGR++)
+	{
+		gpimgRep[uilp]->imageData[WIDTH*3*uilpPY+ WIDTH*3-uilpPX*3 + uilpPBGR ] = gpimgMat[uilp]->imageData[WIDTH*3*uilpPY+uilpPX*3 +uilpPBGR];
+	}
+
+	cvReleaseCapture (&captFile);
 
 // // --------------------------------------------------------------
 // //  check processtime
@@ -200,9 +238,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 	{
 		llTickA = cvGetTickCount();
 		frame = cvQueryFrame (capture);
-		for(uilpPX=0;uilpPX<(640*480*3);uilpPX++)
+		for(uilpPY=0;uilpPY<(HEIGHT);uilpPY++)
+		for(uilpPX=0;uilpPX<(WIDTH);uilpPX++)
+		for(uilpPBGR=0;uilpPBGR<(3);uilpPBGR++)
 		{
-			gpimgMat[uilp]->imageData[uilpPX] = frame->imageData[uilpPX];
+			gpimgMat[uilp]->imageData[WIDTH*3*uilpPY+ WIDTH*3-uilpPX*3 + 2-uilpPBGR ] = frame->imageData[WIDTH*3*uilpPY+uilpPX*3 +uilpPBGR];
 		}
 		cvShowImage ("Capture", gpimgMat[uilp]);
 		cvShowImage ("Replay", gpimgRep[uilp]);
@@ -239,8 +279,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 	}
 	uiTargetWaitMs = (int)(dMaxTmp+0.9)+10;
 	printf("max time= %f\tavefage= %f\n",dMaxTmp, dSumTmp/(N_LOOP_EVAL_SYS-1));
-
-
+	if (uiTargetWaitMs < WAIT_FRAME_MS)
+	{
+		uiTargetWaitMs = WAIT_FRAME_MS;
+		printf("change wait to = %d\n",uiTargetWaitMs);
+	}
 
 
 // 	for(uilp=0;uilp<10;uilp++)
@@ -286,9 +329,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 		dRemainWaitTime=0;
 //	if(uiFlagOpenWin==1)
 //	{
-	  PlaySound("c:\\tst.wav",NULL,SND_FILENAME | SND_ASYNC);//sound start
+	  PlaySound("kakumabon03.wav",NULL,SND_FILENAME | SND_ASYNC);//sound start
 //		while (1) {
-		for(uilp=0;uilp<MAX_N_FRAME;uilp++){
+		for(uilp=0;uilp<uiNumFrameMax;uilp++){
 
 	//	  GetLocalTime(&stTime);
 	//		cvGetTickCount();
@@ -299,10 +342,16 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 			
 //			cvCopyImage(frame,gpimgMat[uilp]);
 
-				for(uilpPX=0;uilpPX<(640*480*3);uilpPX++)
-				{
-					gpimgMat[uilp]->imageData[uilpPX] = frame->imageData[uilpPX];
-				}
+		for(uilpPY=0;uilpPY<(HEIGHT);uilpPY++)
+		for(uilpPX=0;uilpPX<(WIDTH);uilpPX++)
+		for(uilpPBGR=0;uilpPBGR<(3);uilpPBGR++)
+		{
+			gpimgMat[uilp]->imageData[WIDTH*3*uilpPY+ WIDTH*3-uilpPX*3 + uilpPBGR ] = frame->imageData[WIDTH*3*uilpPY+uilpPX*3 +uilpPBGR];
+		}
+//				for(uilpPX=0;uilpPX<(WIDTH*HEIGHT*3);uilpPX++)
+//				{
+//					gpimgMat[uilp]->imageData[uilpPX] = frame->imageData[uilpPX];
+//				}
 
 // 			pllMemDistination =(long long *)&(gpimgMat[uilp]->imageData[0]);
 // 			pllMemSource =(long long *)&(frame->imageData[0]);
@@ -343,6 +392,25 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 		cvDestroyWindow ("Capture");
 		cvDestroyWindow ("Replay");
 
+	cvReleaseCapture (&capture);
+
+// // --------------------------------------------------------------
+// //  invert
+// // --------------------------------------------------------------
+
+	for(uilp=0;uilp<uiNumFrameMax;uilp++)
+	for(uilpPY=0;uilpPY<(HEIGHT);uilpPY++)
+	{
+		for(uilpPX=0;uilpPX<(WIDTH);uilpPX++)
+			for(uilpPBGR=0;uilpPBGR<(3);uilpPBGR++)
+			{
+				uiMatHBuf[WIDTH*3-uilpPX*3 + uilpPBGR ] = gpimgMat[uilp]->imageData[WIDTH*3*uilpPY+uilpPX*3 +uilpPBGR];
+			}
+		for(uilpPX=0;uilpPX<(WIDTH*3);uilpPX++)
+			gpimgMat[uilp]->imageData[WIDTH*3*uilpPY+ uilpPX ] = uiMatHBuf[uilpPX];
+
+	}
+
 
 // // --------------------------------------------------------------
 // //  replay
@@ -350,7 +418,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 		cvNamedWindow ("ReplayNow", CV_WINDOW_AUTOSIZE);
 //		c = cvWaitKey (1000); // wait n milliseconds
 
-		for(uilp=0;uilp<MAX_N_FRAME;uilp++)
+		for(uilp=0;uilp<uiNumFrameMax;uilp++)
 		{
 			// cvCopyImage(gpimgMat[uilp],frame);
 //			frame = cvCloneImage(gpimgMat[uilp]);
@@ -375,34 +443,65 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 		cvDestroyWindow ("ReplayNow");
 //	}
 
-
+	int iFlgRtn = 0;
 // // --------------------------------------------------------------
 // //  file save
 // // --------------------------------------------------------------
-		printf("guiFlagFrameOver=%d\n",guiFlagFrameOver);
-		printf("waitTime=%d[ms]\n",uiTargetWaitMs);
+		//printf("guiFlagFrameOver=%d\n",guiFlagFrameOver);
+		//printf("waitTime=%d[ms]\n",uiTargetWaitMs);
 		double dRecodeFps = (1/(double)(uiTargetWaitMs)*1000);
-		printf("Frame Per Sec =%f\n",dRecodeFps);
-		printf(" save file now....");
+		//printf("Frame Per Sec =%f\n",dRecodeFps);
+//	MessageBox(NULL, sprintf("ovFlg=%d intrvl=%d[ms]",guiFlagFrameOver,uiTargetWaitMs), "message", MB_OK);
+		//printf(" save file now....");
 //	vw = cvCreateVideoWriter (FNameSv, -1, 15, cvSize ((int) w, (int) h),1);
 //		vw = cvCreateVideoWriter (FNameSv, CV_FOURCC ('M', 'S', 'V', 'C'), 15, cvSize (WIDTH, HEIGHT),1);
-		vw = cvCreateVideoWriter (FNameSv, CV_FOURCC ('M', 'S', 'V', 'C'), dRecodeFps, cvSize (WIDTH, HEIGHT),1);
+//		vw = cvCreateVideoWriter (FNameSv, CV_FOURCC ('M', 'S', 'V', 'C'), dRecodeFps, cvSize (WIDTH, HEIGHT),1);
+//		vw = cvCreateVideoWriter (FNameSv, CV_FOURCC ('M', 'S', 'V', 'C'), dRecodeFps, cvSize (WIDTH, HEIGHT),1);
+//		MessageBox(NULL, "select format", "message", MB_OK);
+//		vw = cvCreateVideoWriter (FNameSv, -1, dRecodeFps, cvSize (WIDTH, HEIGHT),1);
+//		vw = cvCreateVideoWriter (".\\captMv.avi", -1, dRecodeFps, cvSize (WIDTH, HEIGHT),1);
 
-		for(uilp=0;uilp<MAX_N_FRAME;uilp++)
+		char cFnamesvbuf[16];
+//		wsprintf(cFnamesvbuf,"%s",FNameSv);
+		uiFlCounter = uiFlCounter+1;
+		//wsprintf(FNameLd,".\\captMv%05d.avi",uiFlCounter);
+		wsprintf(cFnamesvbuf,".\\captMv%05d.avi",uiFlCounter);
+		vw = cvCreateVideoWriter (cFnamesvbuf, CV_FOURCC ('M', 'S', 'V', 'C'), dRecodeFps, cvSize (WIDTH, HEIGHT),1);
+
+		if (vw == NULL)
 		{
-			 cvWriteFrame (vw, gpimgMat[uilp]);//for video
+			wsprintf(cMessBuf,"ERROR in create video writer %X",vw);
+			MessageBox(NULL,cMessBuf , "error", MB_OK);
+		}
+		else
+		{
+			wsprintf(cMessBuf,"create video writer %X",vw);
+//			MessageBox(NULL,cMessBuf , "message", MB_OK);
+		}
+
+
+//		MessageBox(NULL, "save file start", "message", MB_OK);
+		for(uilp=0;uilp<uiNumFrameMax;uilp++)
+		{
+			iFlgRtn=cvWriteFrame (vw, gpimgMat[uilp]);//for video
+			//return 1 is correct. if (iFlgRtn!=0)
+/*			if (iFlgRtn!=1)
+			{
+				wsprintf(cMessBuf,"error in write frame %d",iFlgRtn);
+				MessageBox(NULL, cMessBuf, "error", MB_OK);
+				break;
+			}*/
 			// it takes too much time!
-			if(uilp%(MAX_N_FRAME/8)==0)	printf("..");
+			// if(uilp%(MAX_N_FRAME/8)==0)	printf("..");
 		}
 		cvReleaseVideoWriter (&vw);//for video
-		printf("...done\n");
+		//printf("...done\n");
+//	MessageBox(NULL, "save file done", "message", MB_OK);
 
 // // --------------------------------------------------------------
 // // epilogue
 // // --------------------------------------------------------------
 
-	cvReleaseCapture (&capture);
-	cvReleaseCapture (&captFile);
 	//cvDestroyWindow ("Capture");
 
   return 0;
