@@ -23,7 +23,7 @@ enum{
 	WIDTH = 640,
 	HEIGHT = 480,
 	AREA = WIDTH * HEIGHT,
-	WAIT_FRAME_MS = 105 //33ms = 30fps , 66 ms = 15fps, 50ms = 20fps , 105 is macBook
+	WAIT_FRAME_MS = 105 //33ms = 30fps , 66 ms = 15fps, 50ms = 20fps , 105 is for macBook
 	
 };
 
@@ -40,7 +40,7 @@ unsigned int guiFlagFrameOver=0;
 long gImgLgCapt[MAX_M_TIME][MAX_N_FRAME][AREA]; // 30*30*640*480  //2147483647
 long gImgLgRept[MAX_M_TIME][MAX_N_FRAME][AREA]; // 30*30*640*480  //2147483647
 
-unsigned int uiMatHBuf[WIDTH*3];
+unsigned int guiMatHBuf[WIDTH*3+2];
 
 void SetHeaderIplImg_VGA(IplImage *phead);
 
@@ -83,6 +83,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 	FILE *fid;
 	char cMessBuf[256];
 	char cFnameLdbuf[256];
+	unsigned int uiFlgPlayNow=0;
 
 	guiFlagFrameOver=0;
 	capture = cvCaptureFromCAM  ( 0 );
@@ -90,6 +91,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 	cvSetCaptureProperty (capture, CV_CAP_PROP_FRAME_WIDTH, w);
 	cvSetCaptureProperty (capture, CV_CAP_PROP_FRAME_HEIGHT, h);
 	
+	dFreqTick = cvGetTickFrequency();
 
 
 // // --------------------------------------------------------------
@@ -172,9 +174,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 // //  check processtime
 // // --------------------------------------------------------------
 
-	cvNamedWindow ("Capture", CV_WINDOW_AUTOSIZE);
+	cvNamedWindow ("Camera", CV_WINDOW_AUTOSIZE);
 	cvNamedWindow ("Replay", CV_WINDOW_AUTOSIZE);
-	cvMoveWindow ("Capture", 50,50);
+	cvMoveWindow ("Camera", 50,50);
 	cvMoveWindow ("Replay", 700,50);
 
 	#define N_LOOP_EVAL_SYS 50
@@ -190,7 +192,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 		{
 			gpimgMat[uilp]->imageData[WIDTH*3*uilpPY+ WIDTH*3-uilpPX*3 + 2-uilpPBGR ] = frame->imageData[WIDTH*3*uilpPY+uilpPX*3 +uilpPBGR];
 		}
-		cvShowImage ("Capture", gpimgMat[uilp]);
+		cvShowImage ("Camera", gpimgMat[uilp]);
 		cvShowImage ("Replay", gpimgRep[uilp]);
 		llTickB = cvGetTickCount();
 		dTakesTimeResult = ( llTickB - llTickA)/cvGetTickFrequency() /1000;
@@ -210,8 +212,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 	// time7   3.251036e+001
 	// time8   3.275937e+001
 	// time9   3.179434e+001
-	cvDestroyWindow ("Capture");
+	cvDestroyWindow ("Camera");
 	cvDestroyWindow ("Replay");
+	cvReleaseCapture (&capture);
 
 	double dMaxTmp=0;
 	double dSumTmp=0;
@@ -233,42 +236,123 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 		printf("change wait to = %d\n",uiTargetWaitMs);
 	}
 
+	IplImage *imgPict = 0;
 
+	while(1){
 // // --------------------------------------------------------------
 // //  title
 // // --------------------------------------------------------------
 
-	IplImage *imgPict = 0;
 
-	cvNamedWindow ("Capture", CV_WINDOW_AUTOSIZE);
-	cvNamedWindow ("Replay", CV_WINDOW_AUTOSIZE);
-	cvMoveWindow ("Capture", 50,50);
-	cvMoveWindow ("Replay", 700,50);
 
 	cvNamedWindow ("Title", CV_WINDOW_AUTOSIZE);
-	cvMoveWindow ("Title", 50,50);
+	cvMoveWindow ("Title", 700,50);
 	imgPict=cvLoadImage(".\\title.png",CV_LOAD_IMAGE_ANYCOLOR);
 	cvShowImage ("Title", imgPict);
 	c = cvWaitKey (2000); // wait n milliseconds
 	// cvDestroyWindow ("Title");
+	if (c == '\x1b') uiFlgPlayNow=1;
+	cvDestroyWindow ("Title");
 
+
+	if (uiFlgPlayNow==1)
+	{
 
 // // --------------------------------------------------------------
 // //  instruction
 // // --------------------------------------------------------------
+	capture = cvCaptureFromCAM  ( 0 );
+	cvNamedWindow ("Camera", CV_WINDOW_AUTOSIZE);
+	cvNamedWindow ("Replay", CV_WINDOW_AUTOSIZE);
+	cvMoveWindow ("Camera", 50,50);
+	cvMoveWindow ("Replay", 700,50);
+
 
 	imgPict=cvLoadImage(".\\inst.png",CV_LOAD_IMAGE_ANYCOLOR);
 	cvShowImage ("Title", imgPict);
-	c = cvWaitKey (2000); // wait n milliseconds
+	// c = cvWaitKey (2000); // wait n milliseconds
+	for(uilp=0;uilp<20;uilp++)
+	{
+		llTickA = cvGetTickCount();
+		frame = cvQueryFrame (capture);
+		cvShowImage ("Camera", frame);
+		llTickB = cvGetTickCount();
+		dTakesTimeResult = ( llTickB - llTickA)/dFreqTick /1000;
+		dRemainWaitTime = uiTargetWaitMs - dTakesTimeResult;
+		if (dRemainWaitTime <= 0)
+		{
+			dRemainWaitTime=1;
+		}
+		else
+		{
+			c = cvWaitKey ((int)dRemainWaitTime); // wait n milliseconds
+		}
+		if (c == '\x1b') break;
+	}
 	imgPict=cvLoadImage(".\\3.png",CV_LOAD_IMAGE_ANYCOLOR);
 	cvShowImage ("Title", imgPict);
-	c = cvWaitKey (1000); // wait n milliseconds
+	//c = cvWaitKey (1000); // wait n milliseconds
+	for(uilp=0;uilp<10;uilp++)
+	{
+		llTickA = cvGetTickCount();
+		frame = cvQueryFrame (capture);
+		cvShowImage ("Camera", frame);
+		llTickB = cvGetTickCount();
+		dTakesTimeResult = ( llTickB - llTickA)/dFreqTick /1000;
+		dRemainWaitTime = uiTargetWaitMs - dTakesTimeResult;
+		if (dRemainWaitTime <= 0)
+		{
+			dRemainWaitTime=1;
+		}
+		else
+		{
+			c = cvWaitKey ((int)dRemainWaitTime); // wait n milliseconds
+		}
+		if (c == '\x1b') break;
+	}
 	imgPict=cvLoadImage(".\\2.png",CV_LOAD_IMAGE_ANYCOLOR);
 	cvShowImage ("Title", imgPict);
-	c = cvWaitKey (1000); // wait n milliseconds
+	//c = cvWaitKey (1000); // wait n milliseconds
+	for(uilp=0;uilp<10;uilp++)
+	{
+		llTickA = cvGetTickCount();
+		frame = cvQueryFrame (capture);
+		cvShowImage ("Camera", frame);
+		llTickB = cvGetTickCount();
+		dTakesTimeResult = ( llTickB - llTickA)/dFreqTick /1000;
+		dRemainWaitTime = uiTargetWaitMs - dTakesTimeResult;
+		if (dRemainWaitTime <= 0)
+		{
+			dRemainWaitTime=1;
+		}
+		else
+		{
+			c = cvWaitKey ((int)dRemainWaitTime); // wait n milliseconds
+		}
+		if (c == '\x1b') break;
+	}
+
 	imgPict=cvLoadImage(".\\1.png",CV_LOAD_IMAGE_ANYCOLOR);
 	cvShowImage ("Title", imgPict);
-	c = cvWaitKey (1000); // wait n milliseconds
+	//c = cvWaitKey (1000); // wait n milliseconds
+	for(uilp=0;uilp<10;uilp++)
+	{
+		llTickA = cvGetTickCount();
+		frame = cvQueryFrame (capture);
+		cvShowImage ("Camera", frame);
+		llTickB = cvGetTickCount();
+		dTakesTimeResult = ( llTickB - llTickA)/dFreqTick /1000;
+		dRemainWaitTime = uiTargetWaitMs - dTakesTimeResult;
+		if (dRemainWaitTime <= 0)
+		{
+			dRemainWaitTime=1;
+		}
+		else
+		{
+			c = cvWaitKey ((int)dRemainWaitTime); // wait n milliseconds
+		}
+		if (c == '\x1b') break;
+	}
 
 	cvDestroyWindow ("Title");
 
@@ -286,7 +370,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 		for(uilpPX=0;uilpPX<(WIDTH);uilpPX++)
 		for(uilpPBGR=0;uilpPBGR<(3);uilpPBGR++)
 		{
-			gpimgMat[uilp]->imageData[WIDTH*3*uilpPY+ WIDTH*3-uilpPX*3 + uilpPBGR ] = frame->imageData[WIDTH*3*uilpPY+uilpPX*3 +uilpPBGR];
+			gpimgMat[uilp]->imageData[WIDTH*3*uilpPY+ WIDTH*3-(uilpPX+0)*3 + uilpPBGR ] = frame->imageData[WIDTH*3*uilpPY+uilpPX*3 +uilpPBGR];
 		}
 //				for(uilpPX=0;uilpPX<(WIDTH*HEIGHT*3);uilpPX++)
 //				{
@@ -301,7 +385,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 
 //			 printf("in\t%d\t %X\n",uilp,gpimgMat[uilp]->imageData); // ok
 			
-		cvShowImage ("Capture", gpimgMat[uilp]);
+		cvShowImage ("Camera", gpimgMat[uilp]);
 		cvShowImage ("Replay", gpimgRep[uilp]);
 
 		llTickB = cvGetTickCount();
@@ -322,12 +406,12 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 
 	PlaySound(NULL,NULL,0);//sound stop
 
-	cvDestroyWindow ("Capture");
+	cvDestroyWindow ("Camera");
 	cvDestroyWindow ("Replay");
 	cvReleaseCapture (&capture);
 
 // // --------------------------------------------------------------
-// //  invert
+// //  flip LP current data
 // // --------------------------------------------------------------
 
 	for(uilp=0;uilp<uiNumFrameMax;uilp++)
@@ -336,10 +420,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 		for(uilpPX=0;uilpPX<(WIDTH);uilpPX++)
 		for(uilpPBGR=0;uilpPBGR<(3);uilpPBGR++)
 		{
-			uiMatHBuf[WIDTH*3-uilpPX*3 + uilpPBGR ] = gpimgMat[uilp]->imageData[WIDTH*3*uilpPY+uilpPX*3 +uilpPBGR];
+			guiMatHBuf[WIDTH*3-uilpPX*3 + uilpPBGR -0] = gpimgMat[uilp]->imageData[WIDTH*3*uilpPY+uilpPX*3 +uilpPBGR];
 		}
 		for(uilpPX=0;uilpPX<(WIDTH*3);uilpPX++)
-			gpimgMat[uilp]->imageData[WIDTH*3*uilpPY+ uilpPX ] = uiMatHBuf[uilpPX];
+			gpimgMat[uilp]->imageData[WIDTH*3*uilpPY+ uilpPX ] = guiMatHBuf[uilpPX];
 	}
 
 
@@ -370,25 +454,110 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 	}
 	cvDestroyWindow ("ReplayNow");
 
-
-	int iFlgRtn = 0;
+	//int iFlgRtn = 0;
 // // --------------------------------------------------------------
 // //  file save
 // // --------------------------------------------------------------
-	cvNamedWindow ("Title", CV_WINDOW_AUTOSIZE);
-	cvMoveWindow ("Title", 50,50);
-	imgPict=cvLoadImage(".\\savenow.png",CV_LOAD_IMAGE_ANYCOLOR);
-	cvShowImage ("Title", imgPict);
-	//c = cvWaitKey (2000); // wait n milliseconds
 
- 	char cFnamesvbuf[100];
-	uiFlCounter = uiFlCounter+1;
-	//uiFlCounter = 0;
-	for(uilp=0;uilp< uiNumFrameMax;uilp++)
-	{
-		wsprintf(cFnamesvbuf,".\\LogCapt\\capt%05d_frm%03d.jpg",uiFlCounter,uilp);
-		cvSaveImage(cFnamesvbuf, gpimgMat[uilp],0);
+		cvNamedWindow ("Title", CV_WINDOW_AUTOSIZE);
+		cvMoveWindow ("Title", 700,50);
+		imgPict=cvLoadImage(".\\savenow.png",CV_LOAD_IMAGE_ANYCOLOR);
+		cvShowImage ("Title", imgPict);
+		c = cvWaitKey (100); // wait n milliseconds
+
+	 	char cFnamesvbuf[100];
+		uiFlCounter = uiFlCounter+1;
+		//uiFlCounter = 0;
+		for(uilp=0;uilp< uiNumFrameMax;uilp++)
+		{
+			wsprintf(cFnamesvbuf,".\\LogCapt\\capt%05d_frm%03d.jpg",uiFlCounter,uilp);
+			cvSaveImage(cFnamesvbuf, gpimgMat[uilp],0);
+		}
+		uiFlgPlayNow=0;
+
+
+	// // --------------------------------------------------------------
+	// //  load previous file
+	// // --------------------------------------------------------------
+
+	// 	for (uilp=0;uilp<TGT_N_FRAME;uilp++)
+	// 	{
+	// 		wsprintf(cFnameLdbuf,".\\LogCapt\\capt%05d_frm%03d.jpg",uiFlCounter,uilp);
+	// 		gpimgMat[uilp]=cvLoadImage(cFnameLdbuf,CV_LOAD_IMAGE_ANYCOLOR);
+	// 	}
+	// 
+	// 	uiNumFrameMax = TGT_N_FRAME;
+
+		// flip LR
+		for(uilp=0;uilp<uiNumFrameMax;uilp++)
+		for(uilpPY=0;uilpPY<(HEIGHT);uilpPY++)
+		for(uilpPX=0;uilpPX<(WIDTH);uilpPX++)
+		for(uilpPBGR=0;uilpPBGR<(3);uilpPBGR++)
+		{
+			gpimgRep[uilp]->imageData[WIDTH*3*uilpPY+ WIDTH*3-(uilpPX+0)*3 + uilpPBGR ] = gpimgMat[uilp]->imageData[WIDTH*3*uilpPY+uilpPX*3 +uilpPBGR];
+		}
 	}
+	else
+	{
+		// demo inst
+		
+		imgPict=cvLoadImage(".\\exitp.png",CV_LOAD_IMAGE_ANYCOLOR);
+		cvShowImage ("Title", imgPict);
+		cvMoveWindow ("Title", 700,50);
+		c = cvWaitKey (1000); // wait n milliseconds
+		if (c == '\x1b') break;//halt
+
+		imgPict=cvLoadImage(".\\demo01.png",CV_LOAD_IMAGE_ANYCOLOR);
+		cvShowImage ("Title", imgPict);
+		cvMoveWindow ("Title", 700,50);
+		c = cvWaitKey (1000); // wait n milliseconds
+		if (c == '\x1b') break;//halt
+
+		// load file for demo replay
+		
+//to avoid increasing memory usage// 		for (uilp=0;uilp<TGT_N_FRAME;uilp++)
+//to avoid increasing memory usage// 		{
+//to avoid increasing memory usage// 			wsprintf(cFnameLdbuf,".\\LogCapt\\capt%05d_frm%03d.jpg",uiFlCounter,uilp);
+//to avoid increasing memory usage// 			gpimgRep[uilp]=cvLoadImage(cFnameLdbuf,CV_LOAD_IMAGE_ANYCOLOR);
+//to avoid increasing memory usage// 		}
+	
+		cvDestroyWindow ("Title");
+
+		// // --------------------------------------------------------------
+		// //  replay demo
+		// // --------------------------------------------------------------
+
+		cvNamedWindow ("ReplayDemo", CV_WINDOW_AUTOSIZE);
+		cvMoveWindow ("ReplayDemo", 50,50);
+		PlaySound("kakumabon03.wav",NULL,SND_FILENAME | SND_ASYNC);//sound start
+		for(uilp=0;uilp<uiNumFrameMax;uilp++)
+		{
+			llTickA = cvGetTickCount();
+			cvShowImage ("ReplayDemo", gpimgRep[uilp]);
+			llTickB = cvGetTickCount();
+			dTakesTimeResult = ( llTickB - llTickA)/dFreqTick /1000;
+			dRemainWaitTime = uiTargetWaitMs - dTakesTimeResult;
+			if (dRemainWaitTime <= 0)
+			{
+				guiFlagFrameOver=1;
+				dRemainWaitTime=1;
+			}
+			else
+			{
+				c = cvWaitKey ((int)dRemainWaitTime); // wait n milliseconds
+			}
+			if (c == '\x1b') break;
+		}
+		cvDestroyWindow ("ReplayDemo");
+		
+	imgPict=cvLoadImage(".\\exitp.png",CV_LOAD_IMAGE_ANYCOLOR);
+	cvShowImage ("Title", imgPict);
+	cvMoveWindow ("Title", 700,50);
+	c = cvWaitKey (1000); // wait n milliseconds
+	if (c == '\x1b') break;// halt
+	cvDestroyWindow ("Title");
+
+	}//else if
 
 
 // rem : save as video
@@ -425,7 +594,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 // 	}
 // 	cvReleaseVideoWriter (&vw);//for video
 // //	MessageBox(NULL, "save file done", "message", MB_OK);
+}//while
 	cvDestroyWindow ("Title");
+	MessageBox(NULL, "halt", "message", MB_OK);
 
 // // --------------------------------------------------------------
 // // epilogue
