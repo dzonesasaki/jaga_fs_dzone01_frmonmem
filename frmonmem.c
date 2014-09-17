@@ -14,10 +14,11 @@
 #include <windows.h>
 #include "./SetHeaderIplImg_VGA.c"
 
-const char gsVersion[]="FrmOnMem_v00_1_0";
+const char gsVersion[]="FrmOnMem_v00_1_1";
 
 enum{
 	MAX_N_FRAME = 400,
+	TGT_N_FRAME = 295,
 	MAX_M_TIME = 1,
 	WIDTH = 640,
 	HEIGHT = 480,
@@ -81,6 +82,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 	unsigned int uiFlCounter =1;
 	FILE *fid;
 	char cMessBuf[256];
+	char cFnameLdbuf[256];
 
 	guiFlagFrameOver=0;
 	capture = cvCaptureFromCAM  ( 0 );
@@ -110,10 +112,12 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 // // --------------------------------------------------------------
 // //  check last file
 // // --------------------------------------------------------------
+	for (uilp=0;uilp<256;uilp++) cFnameLdbuf[uilp]=0;
 
 	for (uilp=0;uilp<1000;uilp++) // todo: change max num
 	{
-		wsprintf(FNameLd,".\\captMv%05d.avi",uilp);
+		wsprintf(cFnameLdbuf,".\\LogCapt\\capt%05d_frm%03d.jpg",uilp,(int)(TGT_N_FRAME)-1);
+		// wsprintf(FNameLd,".\\captMv%05d.avi",uilp);
 		fid=fopen(FNameLd,"r");
 		if (fid==NULL)
 		{
@@ -123,25 +127,36 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 		}
 		fclose(fid);
 	}
-	uiFlCounter = uilp-1;
+	//uiFlCounter = (int)uilp-1;
+	uiFlCounter = (int)uilp;
+
 
 // // --------------------------------------------------------------
 // //  load previous file
 // // --------------------------------------------------------------
-	wsprintf(FNameLd,".\\captMv%05d.avi",uiFlCounter);
-	captFile = cvCaptureFromAVI(FNameLd);
-	uilp=0;
-	while(1) // todo: change max loop
+
+// 	wsprintf(FNameLd,".\\captMv%05d.avi",uiFlCounter);
+// 	captFile = cvCaptureFromAVI(FNameLd);
+// 	uilp=0;
+// 	while(1) // todo: change max loop
+// 	{
+// 		if(NULL==(frame=cvQueryFrame(captFile)))
+// 		{
+// 		    break;
+// 		}
+// 		cvCopyImage(frame,gpimgMat[uilp]);
+// 		uilp++;
+// 	}
+// 	uiNumFrameMax = uilp;
+// 	cvReleaseCapture (&captFile);
+
+	for (uilp=0;uilp<TGT_N_FRAME;uilp++)
 	{
-		if(NULL==(frame=cvQueryFrame(captFile)))
-		{
-		    break;
-		}
-		cvCopyImage(frame,gpimgMat[uilp]);
-		uilp++;
+		wsprintf(cFnameLdbuf,".\\LogCapt\\capt%05d_frm%03d.jpg",uiFlCounter,uilp);
+		gpimgMat[uilp]=cvLoadImage(cFnameLdbuf,CV_LOAD_IMAGE_ANYCOLOR);
 	}
-	uiNumFrameMax = uilp;
-	cvReleaseCapture (&captFile);
+
+	uiNumFrameMax = TGT_N_FRAME;
 
 	// flip LR
 	for(uilp=0;uilp<uiNumFrameMax;uilp++)
@@ -333,7 +348,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 // // --------------------------------------------------------------
 
 	cvNamedWindow ("ReplayNow", CV_WINDOW_AUTOSIZE);
-	cvMoveWindow ("Capture", 50,50);
+	cvMoveWindow ("ReplayNow", 50,50);
 	PlaySound("kakumabon03.wav",NULL,SND_FILENAME | SND_ASYNC);//sound start
 	for(uilp=0;uilp<uiNumFrameMax;uilp++)
 	{
@@ -364,41 +379,52 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 	cvMoveWindow ("Title", 50,50);
 	imgPict=cvLoadImage(".\\savenow.png",CV_LOAD_IMAGE_ANYCOLOR);
 	cvShowImage ("Title", imgPict);
-	c = cvWaitKey (2000); // wait n milliseconds
+	//c = cvWaitKey (2000); // wait n milliseconds
 
-	double dRecodeFps = (1/(double)(uiTargetWaitMs)*1000);
-//	MessageBox(NULL, sprintf("ovFlg=%d intrvl=%d[ms]",guiFlagFrameOver,uiTargetWaitMs), "message", MB_OK);
-	char cFnamesvbuf[16];
+ 	char cFnamesvbuf[100];
 	uiFlCounter = uiFlCounter+1;
-	wsprintf(cFnamesvbuf,".\\captMv%05d.avi",uiFlCounter);
-	vw = cvCreateVideoWriter (cFnamesvbuf, CV_FOURCC ('M', 'S', 'V', 'C'), dRecodeFps, cvSize (WIDTH, HEIGHT),1);
-
-	if (vw == NULL)
+	//uiFlCounter = 0;
+	for(uilp=0;uilp< uiNumFrameMax;uilp++)
 	{
-		wsprintf(cMessBuf,"ERROR in create video writer %X",vw);
-		MessageBox(NULL,cMessBuf , "error", MB_OK);
-	}
-	else
-	{
-		wsprintf(cMessBuf,"create video writer %X",vw);
-//			MessageBox(NULL,cMessBuf , "message", MB_OK);
+		wsprintf(cFnamesvbuf,".\\LogCapt\\capt%05d_frm%03d.jpg",uiFlCounter,uilp);
+		cvSaveImage(cFnamesvbuf, gpimgMat[uilp],0);
 	}
 
-//		MessageBox(NULL, "save file start", "message", MB_OK);
-	for(uilp=0;uilp<uiNumFrameMax;uilp++)
-	{
-		iFlgRtn=cvWriteFrame (vw, gpimgMat[uilp]);//for video
-		//return 1 is correct. if (iFlgRtn!=0)
-/*			if (iFlgRtn!=1)
-		{
-			wsprintf(cMessBuf,"error in write frame %d",iFlgRtn);
-			MessageBox(NULL, cMessBuf, "error", MB_OK);
-			break;
-		}*/
-		// it takes too much time!
-	}
-	cvReleaseVideoWriter (&vw);//for video
-//	MessageBox(NULL, "save file done", "message", MB_OK);
+
+// rem : save as video
+// 	double dRecodeFps = (1/(double)(uiTargetWaitMs)*1000);
+// //	MessageBox(NULL, sprintf("ovFlg=%d intrvl=%d[ms]",guiFlagFrameOver,uiTargetWaitMs), "message", MB_OK);
+// 	char cFnamesvbuf[16];
+// 	uiFlCounter = uiFlCounter+1;
+// 	wsprintf(cFnamesvbuf,".\\captMv%05d.avi",uiFlCounter);
+// 	vw = cvCreateVideoWriter (cFnamesvbuf, CV_FOURCC ('M', 'S', 'V', 'C'), dRecodeFps, cvSize (WIDTH, HEIGHT),1);
+// 
+// 	if (vw == NULL)
+// 	{
+// 		wsprintf(cMessBuf,"ERROR in create video writer %X",vw);
+// 		MessageBox(NULL,cMessBuf , "error", MB_OK);
+// 	}
+// 	else
+// 	{
+// 		wsprintf(cMessBuf,"create video writer %X",vw);
+// //			MessageBox(NULL,cMessBuf , "message", MB_OK);
+// 	}
+// 
+// //		MessageBox(NULL, "save file start", "message", MB_OK);
+// 	for(uilp=0;uilp<uiNumFrameMax;uilp++)
+// 	{
+// 		iFlgRtn=cvWriteFrame (vw, gpimgMat[uilp]);//for video
+// 		//return 1 is correct. if (iFlgRtn!=0)
+// // 			if (iFlgRtn!=1)
+// // 		{
+// // 			wsprintf(cMessBuf,"error in write frame %d",iFlgRtn);
+// // 			MessageBox(NULL, cMessBuf, "error", MB_OK);
+// // 			break;
+// // 		}
+// 		// it takes too much time!
+// 	}
+// 	cvReleaseVideoWriter (&vw);//for video
+// //	MessageBox(NULL, "save file done", "message", MB_OK);
 	cvDestroyWindow ("Title");
 
 // // --------------------------------------------------------------
