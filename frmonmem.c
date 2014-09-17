@@ -14,7 +14,7 @@
 #include <windows.h>
 #include "./SetHeaderIplImg_VGA.c"
 
-const char gsVersion[]="FrmOnMem_v00_1_1";
+const char gsVersion[]="FrmOnMem_v00_1_2";
 
 enum{
 	MAX_N_FRAME = 400,
@@ -155,7 +155,12 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 	for (uilp=0;uilp<TGT_N_FRAME;uilp++)
 	{
 		wsprintf(cFnameLdbuf,".\\LogCapt\\capt%05d_frm%03d.jpg",uiFlCounter,uilp);
-		gpimgMat[uilp]=cvLoadImage(cFnameLdbuf,CV_LOAD_IMAGE_ANYCOLOR);
+		frame=cvLoadImage(cFnameLdbuf,CV_LOAD_IMAGE_ANYCOLOR);
+		for (uilpPX=0; uilpPX<(WIDTH*HEIGHT*3); uilpPX++ )
+		{
+			gpimgMat[uilp]->imageData[uilpPX] = frame->imageData[uilpPX];
+		}
+		cvReleaseImage(&frame);
 	}
 
 	uiNumFrameMax = TGT_N_FRAME;
@@ -249,6 +254,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 	cvMoveWindow ("Title", 700,50);
 	imgPict=cvLoadImage(".\\title.png",CV_LOAD_IMAGE_ANYCOLOR);
 	cvShowImage ("Title", imgPict);
+	cvReleaseImage(&imgPict);
 	c = cvWaitKey (2000); // wait n milliseconds
 	// cvDestroyWindow ("Title");
 	if (c == '\x1b') uiFlgPlayNow=1;
@@ -270,6 +276,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 
 	imgPict=cvLoadImage(".\\inst.png",CV_LOAD_IMAGE_ANYCOLOR);
 	cvShowImage ("Title", imgPict);
+	cvReleaseImage(&imgPict);
 	// c = cvWaitKey (2000); // wait n milliseconds
 	for(uilp=0;uilp<20;uilp++)
 	{
@@ -291,6 +298,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 	}
 	imgPict=cvLoadImage(".\\3.png",CV_LOAD_IMAGE_ANYCOLOR);
 	cvShowImage ("Title", imgPict);
+	cvReleaseImage(&imgPict);
 	//c = cvWaitKey (1000); // wait n milliseconds
 	for(uilp=0;uilp<10;uilp++)
 	{
@@ -312,6 +320,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 	}
 	imgPict=cvLoadImage(".\\2.png",CV_LOAD_IMAGE_ANYCOLOR);
 	cvShowImage ("Title", imgPict);
+	cvReleaseImage(&imgPict);
 	//c = cvWaitKey (1000); // wait n milliseconds
 	for(uilp=0;uilp<10;uilp++)
 	{
@@ -332,8 +341,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 		if (c == '\x1b') break;
 	}
 
+	cvReleaseImage(&imgPict);
 	imgPict=cvLoadImage(".\\1.png",CV_LOAD_IMAGE_ANYCOLOR);
 	cvShowImage ("Title", imgPict);
+	cvReleaseImage(&imgPict);
 	//c = cvWaitKey (1000); // wait n milliseconds
 	for(uilp=0;uilp<10;uilp++)
 	{
@@ -463,6 +474,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 		cvMoveWindow ("Title", 700,50);
 		imgPict=cvLoadImage(".\\savenow.png",CV_LOAD_IMAGE_ANYCOLOR);
 		cvShowImage ("Title", imgPict);
+		cvReleaseImage(&imgPict);
 		c = cvWaitKey (100); // wait n milliseconds
 
 	 	char cFnamesvbuf[100];
@@ -474,6 +486,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 			cvSaveImage(cFnamesvbuf, gpimgMat[uilp],0);
 		}
 		uiFlgPlayNow=0;
+		cvReleaseImage(&imgPict);
 
 
 	// // --------------------------------------------------------------
@@ -504,23 +517,29 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 		imgPict=cvLoadImage(".\\exitp.png",CV_LOAD_IMAGE_ANYCOLOR);
 		cvShowImage ("Title", imgPict);
 		cvMoveWindow ("Title", 700,50);
+		cvReleaseImage(&imgPict);
 		c = cvWaitKey (1000); // wait n milliseconds
 		if (c == '\x1b') break;//halt
 
 		imgPict=cvLoadImage(".\\demo01.png",CV_LOAD_IMAGE_ANYCOLOR);
 		cvShowImage ("Title", imgPict);
 		cvMoveWindow ("Title", 700,50);
+		cvReleaseImage(&imgPict);
 		c = cvWaitKey (1000); // wait n milliseconds
 		if (c == '\x1b') break;//halt
 
 		// load file for demo replay
 		
-//to avoid increasing memory usage// 		for (uilp=0;uilp<TGT_N_FRAME;uilp++)
-//to avoid increasing memory usage// 		{
-//to avoid increasing memory usage// 			wsprintf(cFnameLdbuf,".\\LogCapt\\capt%05d_frm%03d.jpg",uiFlCounter,uilp);
-//to avoid increasing memory usage// 			gpimgRep[uilp]=cvLoadImage(cFnameLdbuf,CV_LOAD_IMAGE_ANYCOLOR);
-//to avoid increasing memory usage// 		}
-	
+		for (uilp=0;uilp<TGT_N_FRAME;uilp++)
+		{
+			wsprintf(cFnameLdbuf,".\\LogCapt\\capt%05d_frm%03d.jpg",uiFlCounter,uilp);
+			frame=cvLoadImage(cFnameLdbuf,CV_LOAD_IMAGE_ANYCOLOR);
+			for (uilpPX=0; uilpPX<(WIDTH*HEIGHT*3); uilpPX++ )
+			{
+				gpimgRep[uilp]->imageData[uilpPX] = frame->imageData[uilpPX];
+			}
+			cvReleaseImage(&frame);
+		}
 		cvDestroyWindow ("Title");
 
 		// // --------------------------------------------------------------
@@ -553,6 +572,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 	imgPict=cvLoadImage(".\\exitp.png",CV_LOAD_IMAGE_ANYCOLOR);
 	cvShowImage ("Title", imgPict);
 	cvMoveWindow ("Title", 700,50);
+	cvReleaseImage(&imgPict);
 	c = cvWaitKey (1000); // wait n milliseconds
 	if (c == '\x1b') break;// halt
 	cvDestroyWindow ("Title");
@@ -596,7 +616,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR pCmdLine, int sho
 // //	MessageBox(NULL, "save file done", "message", MB_OK);
 }//while
 	cvDestroyWindow ("Title");
-	MessageBox(NULL, "halt", "message", MB_OK);
+	MessageBox(NULL, "halted", "message", MB_OK);
 
 // // --------------------------------------------------------------
 // // epilogue
